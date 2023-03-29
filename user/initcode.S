@@ -11,7 +11,7 @@ start:
         li a7, SYS_exec
         ecall
 
-# for(;;) exit();
+# for(;;) exit(,"");
 exit:
         li a7, SYS_exit
         ecall
