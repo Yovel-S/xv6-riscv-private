@@ -109,4 +109,10 @@ struct proc {
   //TASK 5
   long long accumulator;
   int ps_priority;
+
+  //TASK 6
+  int cfs_priority;
+  int rtime;   // run time 
+  int stime;   // sleep time
+  int retime;  // runnable time
 };

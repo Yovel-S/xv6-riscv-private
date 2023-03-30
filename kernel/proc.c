@@ -59,6 +59,24 @@ getMinAccumulator(void)
   }
   return min;
 }
+//find the minimun vruntime of all the runnable/running processes
+int
+getMinVruntime(void)
+{
+  struct proc *p;
+  int min = 0;
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == RUNNABLE || p->state == RUNNING){
+      int decay = 75 ? p->cfs_priority == 0 :
+                100 ?  p->cfs_priority == 1 :
+                125;
+      int vruntime = (decay*(p->rtime)) / ((p->rtime)+(p->stime)+(p->retime));
+      if(min == 0 || vruntime < min)
+        min = vruntime;
+    }
+  }
+  return min;
+}
 
 // initialize the proc table.
 void
@@ -272,6 +290,12 @@ userinit(void)
   p->ps_priority = 5;
   p->accumulator = 0;
 
+  //TASL 6
+  p->cfs_priority = 1;
+  p->rtime = 0;
+  p->stime = 0;
+  p->retime = 0;
+
   release(&p->lock);
 }
 
@@ -347,6 +371,12 @@ fork(void)
   np->ps_priority = 5;
   np->accumulator = getMinAccumulator();
 
+  //TASK 6
+  np->cfs_priority = p->cfs_priority;
+  np->rtime = 0;
+  np->stime = 0;
+  np->retime = 0;
+
   return pid;
 }
 
@@ -371,6 +401,36 @@ set_ps_priority(int priority){
   p->ps_priority = priority;
 }
 
+int
+set_cfs_priority(int priority){
+  struct proc *p = myproc();
+  if(0 <= priority && priority <= 2)
+    p->cfs_priority = priority;
+      return 0;
+  return -1;
+}
+
+//returns cfs_priority, rtime, stime, and retime of process with p->pid=pid
+void
+get_cfs_stats(int pid, uint64 p_array){
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->pid == pid){
+      release(&p->lock);
+      goto found;
+    }
+    release(&p->lock);
+  }
+  return;
+
+found:
+  copyout(p->pagetable, p_array, (char *)&p->cfs_priority, sizeof(p->cfs_priority));
+  copyout(p->pagetable, p_array+sizeof(int), (char *)&p->rtime, sizeof(p->rtime));
+  copyout(p->pagetable, p_array+2*sizeof(int), (char *)&p->stime, sizeof(p->stime));
+  copyout(p->pagetable, p_array+3*sizeof(int), (char *)&p->retime, sizeof(p->retime));
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
@@ -380,8 +440,8 @@ exit(int status, char* msg)
   struct proc *p = myproc();
   if(p == initproc)
     panic("init exiting");
-    
-  strncpy(p->exit_msg, msg, 32);
+  
+  strncpy(p->exit_msg, msg, 32);  
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -467,6 +527,46 @@ wait(uint64 addr, uint64 p_exit_msg)
   }
 }
 
+void
+defaulScheduler(struct cpu *c, struct proc *p){
+  if(p->state == RUNNABLE) {
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+  }
+}
+void priorityScheduler(struct cpu *c, struct proc *p){
+  long long acc = getMinAccumulator();
+  if(p->state == RUNNABLE && p->accumulator == acc) {
+      p->state = RUNNING;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+}
+void cfsScheduler(struct cpu *c ,struct proc *p){
+  int min = getMinVruntime();
+  int decay = 75 ? p->cfs_priority == 0 :
+              100 ?  p->cfs_priority == 1 :
+              125;
+  int vruntime = (decay * p->rtime) / (p->rtime+p->stime+p->retime);
+  if(p->state == RUNNABLE && vruntime == min) {
+      p->state = RUNNING;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -479,26 +579,28 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  long long acc = 0;
   c->proc = 0;
+
+  int SCHEDULER_TYPE = 2; //0 for Default, 1 for Priority, 2 for CFS 
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
-      acc = getMinAccumulator();
       acquire(&p->lock);
-      if(p->state == RUNNABLE && p->accumulator == acc) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      switch(SCHEDULER_TYPE){
+        case 0:
+          defaulScheduler(c,p);
+          break;
+        case 1:
+          priorityScheduler(c,p);
+          break;
+        case 2:
+          cfsScheduler(c,p);
+          break;
       }
       release(&p->lock);
     }
@@ -601,7 +703,27 @@ void
 wakeup(void *chan)
 {
   struct proc *p;
-
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == RUNNING){
+      if(p->pid>4)
+        printf("RUNNING: update ticks for pid: %d\nretime %d\n", p->pid, p->retime); 
+      p->rtime = p->rtime + 1;
+    }
+    else{ 
+      if(p->state == SLEEPING){
+        if(p->pid>4)
+          printf("SLEEPING: update ticks for pid: %d\nstime %d\n", p->pid,p->stime); 
+        p->stime = p->stime + 1;
+      }
+      else{ 
+        if(p->state == RUNNABLE){
+          if(p->pid>4)
+            printf("RUNNABLE: update ticks for pid: %d\nretime %d\n", p->pid,p->retime); 
+          p->retime = p->retime + 1;
+        }
+      }
+    }
+  }
   for(p = proc; p < &proc[NPROC]; p++) {
     if(p != myproc()){
       acquire(&p->lock);

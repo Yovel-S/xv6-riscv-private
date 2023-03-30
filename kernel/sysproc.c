@@ -111,3 +111,23 @@ sys_set_ps_priority(void)
   set_ps_priority(n);
   return 0;
 }
+
+// sets the values of the cfs_priority
+uint64
+sys_set_cfs_priority(void)
+{
+  int n;
+  argint(0, &n);
+  return set_cfs_priority(n);
+}
+
+// gets the values of the cfs_priority
+uint64
+sys_get_cfs_stats(void){
+  int n;
+  uint64 p_array;
+  argint(0, &n);
+  argaddr(1, &p_array);
+  get_cfs_stats(n, p_array);
+  return 0;
+}

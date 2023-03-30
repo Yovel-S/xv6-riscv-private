@@ -1,0 +1,16 @@
+TASK 4
+-------------------
+1. The scheduler is implemented in proc.c (line 447)
+2. In will choose the next runnable process in a round robin manner.
+3. First of allm memory is allocated to the process by looking in the process table for an unused proc.
+If found, the system initializes state required to run in the kernel. Then user memory is copied from parent.
+Each CPU calls scheduler after setting itself up. In addition, the scheduling takes place each time a process calls one the system calls: [sleep, yield, exit], which in turn call sched. 
+4. When a process calls one the system calls for instance sleep, yield, or exit,  the method sched is called to call the scheduler to call tje next process to execute.
+
+
+
+
+Lasim lev:
+-What happens when a process calls a system call, for instance
+sleep()?
+-if runtime, sleeptime.. can be ints

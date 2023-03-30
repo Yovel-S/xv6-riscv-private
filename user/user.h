@@ -22,8 +22,11 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int memsize (void);
-void set_ps_priority (int);
+int memsize(void);
+void set_ps_priority(int);
+void set_cfs_priority(int);
+void get_cfs_stats(int, int*);
+
 
 // ulib.c
 int stat(const char*, struct stat*);

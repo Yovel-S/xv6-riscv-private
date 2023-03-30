@@ -8,6 +8,8 @@
 
 struct spinlock tickslock;
 uint ticks;
+extern void update_ticks(void);
+
 
 extern char trampoline[], uservec[], userret[];
 

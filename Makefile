@@ -116,6 +116,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 .PRECIOUS: %.o
 
 UPROGS=\
+	$U/_cfs\
 	$U/_check5_1\
 	$U/_goodbye\
 	$U/_memsize_test\
