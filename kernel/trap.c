@@ -77,8 +77,10 @@ usertrap(void)
     exit(-1,"");
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    p->accumulator += p->ps_priority;
     yield();
+  }
 
   usertrapret();
 }
@@ -127,6 +129,10 @@ usertrapret(void)
   // and switches to user mode with sret.
   uint64 trampoline_userret = TRAMPOLINE + (userret - trampoline);
   ((void (*)(uint64))trampoline_userret)(satp);
+
+  //TASK 5
+  p->accumulator += p->ps_priority;
+
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,
@@ -151,8 +157,10 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
+    myproc()->accumulator += myproc()->ps_priority;
     yield();
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

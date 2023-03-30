@@ -26,6 +26,7 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -43,12 +44,28 @@ proc_mapstacks(pagetable_t kpgtbl)
   }
 }
 
+// Find minimum value of the accumulators of all the runnable/running processes
+int
+getMinAccumulator(void)
+{
+  struct proc *p;
+  int min = 0;
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == RUNNABLE || p->state == RUNNING){
+      if(min == 0 || p->accumulator < min){
+        min = p->accumulator;
+      }
+    }
+  }
+  return min;
+}
+
 // initialize the proc table.
 void
 procinit(void)
 {
   struct proc *p;
-  
+
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
@@ -251,6 +268,10 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  //TASK 5
+  p->ps_priority = 5;
+  p->accumulator = 0;
+
   release(&p->lock);
 }
 
@@ -322,6 +343,10 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  //TASK 5
+  np->ps_priority = 5;
+  np->accumulator = getMinAccumulator();
+
   return pid;
 }
 
@@ -338,6 +363,12 @@ reparent(struct proc *p)
       wakeup(initproc);
     }
   }
+}
+
+void
+set_ps_priority(int priority){
+  struct proc *p = myproc();
+  p->ps_priority = priority;
 }
 
 // Exit the current process.  Does not return.
@@ -448,15 +479,16 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
+  long long acc = 0;
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
+      acc = getMinAccumulator();
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state == RUNNABLE && p->accumulator == acc) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -575,6 +607,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        p->accumulator = getMinAccumulator();
       }
       release(&p->lock);
     }
@@ -683,3 +716,4 @@ procdump(void)
     printf("\n");
   }
 }
+

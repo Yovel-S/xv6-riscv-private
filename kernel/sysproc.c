@@ -101,3 +101,13 @@ sys_memsize(void)
   uint64 sz = p->sz;
   return sz;
 }
+
+// used by a process to change its own priority.
+uint64
+sys_set_ps_priority(void)
+{
+  int n;
+  argint(0, &n);
+  set_ps_priority(n);
+  return 0;
+}
