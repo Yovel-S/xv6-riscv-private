@@ -82,6 +82,7 @@ void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
 
 // proc.c
+struct proc *getProc(int pid);
 int             cpuid(void);
 void            exit(int, char*);
 int             fork(void);

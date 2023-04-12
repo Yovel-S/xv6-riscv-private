@@ -10,7 +10,31 @@ Each CPU calls scheduler after setting itself up. In addition, the scheduling ta
 
 
 
+
+TASK 6
+----------------
+1. No.
+The difference between them is that run time refers to the amount of time a process spends executing on the CPU,
+while sleep time refers to the amount of time a process spends waiting for a particular event, such as I/O completion or a timer expiration. 
+
+2. No.
+The difference is that run time refers to the amount of time that a process has spent executing on the CPU, 
+while runnable time refers to the amount of time that a process spent waiting in the operating system's ready queue, ready to execute but not running now.
+
+3. After running our test a few times, the run times, sleep times, and runnable times of the three child processes were relatively consistent across the tests.
+Our results were relatively consistent since the CFS scheduler is designed to provide fair and balanced CPU allocation to all processes, resulting in consistent run times, sleep times, and runnable times.
+
+4. Yes, A process with a higher priority will be given a larger share of CPU time compared to processes with lower priorities.
+It makes sense to give a higher priority to a process that we want to run more often, because it will receive a larger share of CPU time and be scheduled more frequently.
+
+5. Yes, it makes sense to prioritize which processes get more CPU time based on their importance.
+This ensures that important processes get enough CPU time to work properly and makes the system work better overall.
+
+
+
 Lasim lev:
 -What happens when a process calls a system call, for instance
 sleep()?
 -if runtime, sleeptime.. can be ints
+
+

@@ -14,7 +14,7 @@ sys_exit(void)
   argint(0, &n);
   argstr(1, msg, 32);
   exit(n, msg);
-  return 0;  // not reached
+  return 0; // not reached
 }
 
 uint64
@@ -46,7 +46,7 @@ sys_sbrk(void)
 
   argint(0, &n);
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if (growproc(n) < 0)
     return -1;
   return addr;
 }
@@ -60,8 +60,10 @@ sys_sleep(void)
   argint(0, &n);
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(killed(myproc())){
+  while (ticks - ticks0 < n)
+  {
+    if (killed(myproc()))
+    {
       release(&tickslock);
       return -1;
     }
@@ -123,11 +125,20 @@ sys_set_cfs_priority(void)
 
 // gets the values of the cfs_priority
 uint64
-sys_get_cfs_stats(void){
-  int n;
-  uint64 p_array;
-  argint(0, &n);
-  argaddr(1, &p_array);
-  get_cfs_stats(n, p_array);
+sys_get_cfs_stats(void)
+{
+  int pid;
+  uint64 addr;
+  char ans[4] = {0, 0, 0, 0};
+  argint(0, &pid);
+  argaddr(1, &addr);
+  struct proc *p = getProc(pid);
+  if (p == 0)
+    return -1;
+  ans[0] = p->cfs_priority;
+  ans[1] = p->rtime;
+  ans[2] = p->stime;
+  ans[3] = p->retime;
+  copyout(p->pagetable, addr, ans, 4);
   return 0;
 }
