@@ -3,7 +3,10 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 #include "defs.h"
 
 struct spinlock tickslock;
@@ -152,7 +155,7 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  if(which_dev == 2 && myproc() != 0 && mykthread()->tstate == TRUNNING)
     yield();
 
   // the yield() may have caused some traps to occur,

@@ -11,7 +11,10 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "stat.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 
 struct devsw devsw[NDEV];
 struct {

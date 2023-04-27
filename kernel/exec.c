@@ -3,7 +3,10 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 #include "defs.h"
 #include "elf.h"
 

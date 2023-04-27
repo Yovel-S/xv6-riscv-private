@@ -5,7 +5,10 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "riscv.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 #include "defs.h"
 
 void

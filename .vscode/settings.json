@@ -4,6 +4,10 @@
         "riscv.h": "c",
         "defs.h": "c",
         "type_traits": "c",
-        "proc.h": "c"
+        "proc.h": "c",
+        "param.h": "c",
+        "spinlock.h": "c",
+        "memlayout.h": "c",
+        "uthread.h": "c"
     },
 }

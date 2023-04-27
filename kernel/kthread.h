@@ -1,3 +1,11 @@
+#ifndef PROC_H
+#define PROC_H
+#include "proc.h"
+#endif
+#ifndef UTHREAD_H
+#define UTHREAD_H
+#include "user/uthread.h"
+#endif
 
 // per-process data for the trap handling code in trampoline.S.
 // sits in a page by itself just under the trampoline page in the
@@ -49,6 +57,16 @@ struct trapframe {
   /* 272 */ uint64 t5;
   /* 280 */ uint64 t6;
 };
+enum threadstate
+{
+  TUNUSED,
+  TUSED,
+  TSLEEPING,
+  TRUNNABLE,
+  TRUNNING,
+  TZOMBIE
+};
+
 
 struct kthread
 {
@@ -58,8 +76,8 @@ struct kthread
   struct trapframe *trapframe;  // data page for trampoline.S
   //Task2:
   struct spinlock lock;
-  // p->lock must be held when using these:
-  enum procstate state; // thread state
+  // t->lock must be held when using these:
+  enum threadstate tstate; // thread state
   void *chan;           // If non-zero, sleeping on chan
   int killed;           // If non-zero, have been killed
   int xstate;           // Exit status to be returned to parent's wait
@@ -68,6 +86,16 @@ struct kthread
   // wait_lock must be held when using this:
   struct proc *process; // A pointer to the PCB it belongs to
 
-  // these are private to the process, so p->lock need not be held.
-  uint64 kstack; // Virtual address of kernel stack
+  struct context context; // swtch() here to run thread
 };
+
+// Per-CPU state.
+struct cpu
+{
+  struct kthread *thread; // The kthread running on this cpu, or null.
+  struct context context; // swtch() here to enter scheduler().
+  int noff;               // Depth of push_off() nesting.
+  int intena;             // Were interrupts enabled before push_off()?
+};
+
+extern struct cpu cpus[NCPU];

@@ -20,7 +20,10 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "defs.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x

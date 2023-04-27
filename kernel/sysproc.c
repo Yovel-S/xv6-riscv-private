@@ -4,7 +4,10 @@
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
+#ifndef PROC_H
+#define PROC_H
 #include "proc.h"
+#endif
 
 uint64
 sys_exit(void)

@@ -1,3 +1,5 @@
+#include "kernel/types.h"
+
 #define STACK_SIZE  4000
 #define MAX_UTHREADS  4
 
