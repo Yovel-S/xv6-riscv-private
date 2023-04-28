@@ -96,7 +96,10 @@ myproc(void)
 {
   push_off();
   struct cpu *c = mycpu();
-  
+  if(c->thread == 0){
+    pop_off();
+    return 0;
+  }
   struct proc *p = c->thread->process;
   pop_off();
   return p;
@@ -257,10 +260,10 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = TRUNNABLE;
+  p->state = USED;
   kt->tstate = TRUNNABLE;
-  release(&p->lock);
   release(&kt->lock);
+  release(&p->lock);
 }
 
 // Grow or shrink user memory by n bytes.
@@ -513,7 +516,8 @@ scheduler(void)
             kt->tstate = TRUNNING;
             c->thread = kt;
             swtch(&c->context, &kt->context);
-            }
+          }
+          release(&kt->lock);
         }
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -536,20 +540,18 @@ sched(void)
 {
   int intena;
   struct proc *p = myproc();
-
+  struct kthread *kt = mykthread();
   if(!holding(&p->lock))
     panic("sched p->lock");
-  if(mycpu()->noff != 1)
+  if(mycpu()->noff != 2)
     panic("sched locks");
-  if(p->state == USED)
+  if(kt->tstate == TRUNNING)
     panic("sched used");
   if(intr_get())
     panic("sched interruptible");
-
   intena = mycpu()->intena;
   // swtch(&p->context, &mycpu()->context);
-  struct kthread *t = mykthread();
-  swtch(&t->context, &mycpu()->context);
+  swtch(&kt->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
 
@@ -558,10 +560,12 @@ void
 yield(void)
 {
   struct kthread *kt = mykthread();
+  acquire(&kt->process->lock);
   acquire(&kt->lock);
   kt->tstate = TRUNNABLE;
   sched();
   release(&kt->lock);
+  release(&kt->process->lock);
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -571,6 +575,7 @@ forkret(void)
 {
   static int first = 1;
 
+  release(&myproc()->kthread->lock);
   // Still holding p->lock from scheduler.
   release(&myproc()->lock);
 
@@ -600,6 +605,7 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup locks p->lock),
   // so it's okay to release lk.
 
+  acquire(&t->process->lock);  //DOC: sleeplock1
   acquire(&t->lock);  //DOC: sleeplock1
   release(lk);
 
@@ -614,6 +620,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Reacquire original lock.
   release(&t->lock);
+  release(&t->process->lock);
   acquire(lk);
 }
 
