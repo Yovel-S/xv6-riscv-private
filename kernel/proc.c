@@ -139,7 +139,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
-  p->state = USED;
+  // p->state = USED;
   p->next_thread_id = 1;
 
 
@@ -245,6 +245,7 @@ userinit(void)
   struct proc *p;
 
   p = allocproc();
+  p->state = USED;
   initproc = p;
   struct kthread *kt = &p->kthread[0];
   
@@ -334,7 +335,7 @@ fork(void)
 
   acquire(&np->lock);
   np->state = USED;
-  acquire(&np->kthread[0].lock);
+  // acquire(&np->kthread[0].lock);
   np->kthread[0].tstate = TRUNNABLE;
   release(&np->kthread[0].lock);
   release(&np->lock);
