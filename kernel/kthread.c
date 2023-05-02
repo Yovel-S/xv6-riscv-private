@@ -17,18 +17,17 @@ extern struct proc proc[NPROC];
 extern void forkret(void);
 
 // Given a proc , it allocates a unique kernel thread ID using the counter and lock inside the proc
-int alloctid()
+int alloctid(struct proc *p)
 {
-  struct proc *p = myproc();
   acquire(&p->thread_id_lock);
-  int tid = p->next_thread_id++;
+  int tid = p->next_thread_id;
+  p->next_thread_id = p->next_thread_id+1;
   release(&p->thread_id_lock);
   return tid;
 }
 
 void kthreadinit(struct proc *p)
 {
-  initlock(&p->thread_id_lock, "thread ID allocation lock");
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
     initlock(&kt->lock, "kthread");
@@ -42,7 +41,9 @@ void kthreadinit(struct proc *p)
 // Fetches and returns the current running thread from the current cpu’s cpu structs.
 struct kthread *mykthread()
 {
+  push_off();
   struct cpu *c = mycpu();
+  pop_off();
   return c->thread;
 }
 
@@ -68,6 +69,7 @@ struct kthread *allocthread(struct proc *p)
     if (kt->tstate == TUNUSED)
     {
       kt->tstate = TUSED;
+      kt->thread_id = alloctid(p);
       kt->trapframe = get_kthread_trapframe(p, kt);
       memset(&kt->context, 0, sizeof(kt->context));
       kt->context.ra = (uint64)forkret;
@@ -85,11 +87,11 @@ freekthread(struct kthread *kt)
   /*
   Given a kthread, it sets its fields to null / zero, and the state to TUNUSED.
   */
-  if (kt->trapframe)
-    kfree((void *)kt->trapframe);
-  kt-> kstack = 0;
+  // if (kt->trapframe)
+  //   kfree((void *)kt->trapframe);
   kt->trapframe = 0;
-  kt->process = 0;
+  kt-> kstack = 0;
+  // kt->process = 0;
   kt->killed = 0;
   kt->xstate = 0;
   kt->thread_id = 0;
