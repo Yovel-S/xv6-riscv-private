@@ -45,8 +45,9 @@ struct kthread *mykthread()
 {
   push_off();
   struct cpu *c = mycpu();
+  struct kthread *kt = c->thread;
   pop_off();
-  return c->thread;
+  return kt;
 }
 
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
@@ -64,6 +65,7 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 // Function for allocating a new kernel thread for a process
 struct kthread *allocthread(struct proc *p)
 {
+  //printf("allocthread\n");
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
@@ -76,6 +78,7 @@ struct kthread *allocthread(struct proc *p)
       memset(&kt->context, 0, sizeof(kt->context));
       kt->context.ra = (uint64)forkret;
       kt->context.sp = kt->kstack + PGSIZE;
+      //printf("allocthread: thread_id = %d\n", kt->thread_id);
       return kt;
     }
     release(&kt->lock);
@@ -92,11 +95,11 @@ freekthread(struct kthread *kt)
   // if (kt->trapframe)
   //   kfree((void *)kt->trapframe);
   // kt-> kstack = 0;
-  // kt->process = 0;
-  kt->trapframe = 0; //TODO: check if to leave it here or no
+  //kt->process = 0;
+  //kt->trapframe = 0; //TODO: check if to leave it here or no
   kt->killed = 0;
   kt->xstate = 0;
-  kt->thread_id = 0;
+  //kt->thread_id = 0;
   kt->chan = 0;
   kt->tstate = TUNUSED;
 }
