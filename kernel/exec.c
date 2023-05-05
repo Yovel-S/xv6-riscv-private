@@ -114,6 +114,11 @@ exec(char *path, char **argv)
   if(copyout(pagetable, sp, (char *)ustack, (argc+1)*sizeof(uint64)) < 0)
     goto bad;
 
+
+  // Terminates all threads except the current thread and waits for them to exit
+  kill_all_other_threads();
+
+
   // arguments to user main(argc, argv)
   // argc is returned via the system call return
   // value, which goes in a0.

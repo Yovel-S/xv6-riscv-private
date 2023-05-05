@@ -65,6 +65,10 @@ sys_sleep(void)
       release(&tickslock);
       return -1;
     }
+    if(kthread_killed(mykthread())){
+      release(&tickslock);
+      return -1;
+    }
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
@@ -91,4 +95,49 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_kthread_create(void)
+{
+  void *start_func;
+  argaddr(0, &start_func);
+  void *stack;
+  argaddr(1, &stack);
+  uint stack_size;
+  argint(2, &stack_size);
+  return kthread_create(start_func, stack, stack_size);
+}
+
+uint64
+sys_kthread_id(void)
+{
+  return mykthread()->thread_id;
+}
+
+uint64
+sys_kthread_kill(void)
+{
+  int thread_id;
+
+  argint(0, &thread_id);
+  return kthread_kill(thread_id);
+}
+
+uint64
+sys_kthread_exit(void)
+{
+  int status;
+  argint(0, &status);
+  return kthread_exit(status);
+}
+
+uint64
+sys_kthread_join(void)
+{
+  int thread_id;
+  argint(0, &thread_id); //Sababa?
+  uint64 status;
+  argaddr(1, &status); //Sababa?
+  return kthread_join(thread_id, status);
 }

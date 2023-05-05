@@ -65,3 +65,5 @@
 //   TRAPFRAME (kt->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME(kt_idx) (TRAMPOLINE - PGSIZE + (kt_idx * sizeof(struct trapframe)))
+
+#define KTHREAD_STACK_SIZE 4000
