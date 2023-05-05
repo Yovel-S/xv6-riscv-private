@@ -59,8 +59,8 @@ void proc_mapstacks(pagetable_t kpgtbl)
 // initialize the proc table.
 void procinit(void)
 {
-  //printf("init");
   struct proc *p;
+
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for (p = proc; p < &proc[NPROC]; p++)
@@ -70,7 +70,6 @@ void procinit(void)
     p->state = UNUSED;
     kthreadinit(p);
   }
-  //printf("init done");
 }
 
 // Must be called with interrupts disabled,
@@ -96,7 +95,6 @@ mycpu(void)
 struct proc *
 myproc(void)
 {
-  // printf("myproc\n");
   push_off();
   struct cpu *c = mycpu();
   if (c->thread == 0)
@@ -106,7 +104,6 @@ myproc(void)
   }
   struct proc *p = c->thread->process;
   pop_off();
-  // printf("myproc done\n");
   return p;
   // if (mykthread() == 0)
   // {
@@ -134,8 +131,8 @@ int allocpid()
 static struct proc *
 allocproc(void)
 {
-  //printf("allocproc\n");
   struct proc *p;
+
   for (p = proc; p < &proc[NPROC]; p++)
   {
     acquire(&p->lock);
@@ -145,7 +142,7 @@ allocproc(void)
     }
     else
     {
-    release(&p->lock);
+      release(&p->lock);
     }
   }
   return 0;
@@ -162,6 +159,7 @@ found:
     release(&p->lock);
     return 0;
   }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if (p->pagetable == 0)
@@ -176,11 +174,8 @@ found:
   if (allocthread(p) == 0)
     return 0;
 
-  //allocate thread to the start of kthread array
-
   // TODO: delte this after you are done with task 2.2
   // allocproc_help_function(p);
-  //printf("allocproc done\n");
   return p;
 }
 
@@ -189,23 +184,20 @@ wrote, free the base_trapframes field and set it to zero.*/
 static void
 freeproc(struct proc *p)
 {
-  //printf("freeproc\n");
   if (p->base_trapframes)
     kfree((void *)p->base_trapframes);
-  if (p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
-  //p->base_trapframes = 0;
+  p->base_trapframes = 0;
 
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
-    //acquire(&kt->lock);
-    //if (kt->tstate != TUNUSED)
-    freekthread(kt);
-    //kfree(kt);
-    //release(&kt->lock);
+    acquire(&kt->lock);
+    if (kt->tstate != TUNUSED)
+      freekthread(kt);
+    release(&kt->lock);
   }
-  
+  if (p->pagetable)
+    proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -214,7 +206,6 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  //printf("freeproc done\n");
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -222,7 +213,6 @@ freeproc(struct proc *p)
 pagetable_t
 proc_pagetable(struct proc *p)
 {
-  //printf("proc_pagetable\n");
   pagetable_t pagetable;
 
   // An empty page table.
@@ -250,7 +240,7 @@ proc_pagetable(struct proc *p)
     uvmfree(pagetable, 0);
     return 0;
   }
-  //printf("proc_pagetable done\n");
+
   return pagetable;
 }
 
@@ -258,11 +248,9 @@ proc_pagetable(struct proc *p)
 // physical memory it refers to.
 void proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
-  //printf("proc_freepagetable\n");
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME(0), 1, 0);
   uvmfree(pagetable, sz);
-  //printf("proc_freepagetable done\n");
 }
 
 // a user program that calls exec("/init")
@@ -280,7 +268,6 @@ uchar initcode[] = {
 // Set up first user process.
 void userinit(void)
 {
-  //printf("userinit\n");
   struct proc *p;
 
   p = allocproc();
@@ -304,7 +291,6 @@ void userinit(void)
   kt->tstate = TRUNNABLE;
   release(&kt->lock);
   release(&p->lock);
-  //printf("userinit done\n");
 }
 
 // Grow or shrink user memory by n bytes.
@@ -369,15 +355,16 @@ int fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
+  release(&np->kthread[0].lock);
   release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
-  np->kthread[0].process = np;
+  //np->kthread[0].process = np;
   release(&wait_lock);
 
   acquire(&np->lock);
+  acquire(&np->kthread[0].lock);
   np->state = USED;
   np->kthread[0].tstate = TRUNNABLE;
   release(&np->kthread[0].lock);
@@ -397,7 +384,6 @@ void reparent(struct proc *p)
     if (pp->parent == p)
     {
       pp->parent = initproc;
-      //printf("reparent wakeup\n");
       wakeup(initproc);
     }
   }
@@ -454,7 +440,6 @@ void exit_process(int status)
   reparent(p);
 
   // Parent might be sleeping in wait().
-  //printf("exit wakeup\n");
   wakeup(p->parent);
 
   acquire(&p->lock);
@@ -478,18 +463,14 @@ void exit_process(int status)
 // zombie. The kernel thread state should be changed into zombie as well.
 void exit(int status)
 {
-  //printf("check1\n");
   exit_threads(status);
-  //printf("check2\n");
   exit_process(status);
-  //printf("check3\n");
 }
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int wait(uint64 addr)
 {
-  //printf("wait\n");
   struct proc *pp;
   int havekids, pid;
   struct proc *p = myproc();
@@ -533,10 +514,9 @@ int wait(uint64 addr)
       release(&wait_lock);
       return -1;
     }
-    //("sleeping\n");
+
     // Wait for a child to exit.
     sleep(p, &wait_lock); // DOC: wait-sleep
-    //printf("waking up\n");
   }
 }
 
@@ -549,7 +529,6 @@ int wait(uint64 addr)
 //    via swtch back to the scheduler.
 void scheduler(void)
 {
-  //printf("scheduler\n");
   struct proc *p;
   struct cpu *c = mycpu();
 
@@ -587,7 +566,6 @@ void scheduler(void)
       }
     }
   }
-  //printf("end\n");
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -618,13 +596,11 @@ void sched(void)
 // Give up the CPU for one scheduling round.
 void yield(void)
 {
-  // printf("yield\n");
   struct kthread *kt = mykthread();
   acquire(&kt->lock);
   kt->tstate = TRUNNABLE;
   sched();
   release(&kt->lock);
-  // printf("yield end\n");
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -685,7 +661,6 @@ void sleep(void *chan, struct spinlock *lk)
 // Must be called without any p->lock.
 void wakeup(void *chan)
 {
-  // printf("wakeup\n");
   struct proc *p;
   struct kthread *kt;
   for (p = proc; p < &proc[NPROC]; p++)
@@ -706,7 +681,6 @@ void wakeup(void *chan)
       release(&p->lock);
     }
   }
-  // printf("wakeup end\n");
 }
 
 // Kill the process with the given pid.
@@ -716,7 +690,6 @@ void wakeup(void *chan)
 // kernel threads after setting the process’ killed flag value to 1.
 int kill(int pid)
 {
-  //printf("kill\n");
   struct proc *p;
   struct kthread *t;
   for (p = proc; p < &proc[NPROC]; p++)
@@ -733,7 +706,6 @@ int kill(int pid)
         release(&t->lock);
       }
       release(&p->lock);
-      //printf("end kill\n");
       return 0;
     }
     release(&p->lock);

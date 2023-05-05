@@ -21,12 +21,12 @@ int alloctid(struct proc *p)
 {
   acquire(&p->thread_id_lock);
   int tid = p->next_thread_id;
-  p->next_thread_id = p->next_thread_id+1;
+  p->next_thread_id = p->next_thread_id + 1;
   release(&p->thread_id_lock);
   return tid;
 }
 
-//This function will be called once for each process at the initialization time of xv6.
+// This function will be called once for each process at the initialization time of xv6.
 void kthreadinit(struct proc *p)
 {
   initlock(&p->thread_id_lock, "nexttid");
@@ -65,7 +65,7 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 // Function for allocating a new kernel thread for a process
 struct kthread *allocthread(struct proc *p)
 {
-  //printf("allocthread\n");
+  // printf("allocthread\n");
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
@@ -78,7 +78,7 @@ struct kthread *allocthread(struct proc *p)
       memset(&kt->context, 0, sizeof(kt->context));
       kt->context.ra = (uint64)forkret;
       kt->context.sp = kt->kstack + PGSIZE;
-      //printf("allocthread: thread_id = %d\n", kt->thread_id);
+      // printf("allocthread: thread_id = %d\n", kt->thread_id);
       return kt;
     }
     release(&kt->lock);
@@ -95,12 +95,11 @@ freekthread(struct kthread *kt)
   // if (kt->trapframe)
   //   kfree((void *)kt->trapframe);
   // kt-> kstack = 0;
-  //kt->process = 0;
-  //kt->trapframe = 0; //TODO: check if to leave it here or no
+  // kt->process = 0;
+  // kt->trapframe = 0; //TODO: check if to leave it here or no
   kt->killed = 0;
   kt->xstate = 0;
-  //kt->thread_id = 0;
+  // kt->thread_id = 0;
   kt->chan = 0;
   kt->tstate = TUNUSED;
 }
-
