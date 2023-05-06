@@ -14,32 +14,37 @@
 #include "kernel/elf.h"
 
 struct uthread uthreads[MAX_UTHREADS];
-
+int called_start_all_flag = 0;
 struct uthread *mythread;
-int first_thread = 1;
+int num_threads=0;
 void uthreadinit(void);
 
-struct uthread *uscheduler(){
-    int max_prio = 0;
-    struct uthread *max_prio_t = mythread;
-    struct uthread *t;
-    for(t = uthreads; t < &uthreads[MAX_UTHREADS]; t++)
-        if (t->state == RUNNABLE)
-            if(t->priority > max_prio){
-                max_prio = t->priority;
-                max_prio_t = t;
-            }
-    return max_prio_t;
+void uscheduler(){
+    //find thread with max priority:
+    struct uthread *ut;
+    enum sched_priority max_priority = LOW;
+    struct uthread *max_priority_thread = 0;
+    for (ut = uthreads; ut < &uthreads[MAX_UTHREADS]; ut++)
+    {
+        if (ut->state == RUNNABLE && ut->priority >= max_priority)
+        {
+            max_priority = ut->priority;
+            max_priority_thread = ut;
+        }
+    }
+    //switch to thread with max priority
+    struct uthread *temp = mythread;
+    mythread = max_priority_thread;
+    mythread->state = RUNNING;
+    uswtch(&temp->context, &mythread->context);
 }
 
 
 void
 uthread_yield()
 {
-    struct uthread *uthread = uscheduler();
     mythread->state = RUNNABLE;
-    uthread->state = RUNNING;
-    uswtch(&mythread->context, &uthread->context);
+    uscheduler();
 }
 
 int get_empty_thread_slot(){
@@ -51,17 +56,13 @@ int get_empty_thread_slot(){
 }
 
 int uthread_create(void (*start_func)(), enum sched_priority priority){
-    if(first_thread){
-        uthreadinit();
-        first_thread = 0;
-    }
     int slot = get_empty_thread_slot();
-
     if(slot == -1){
         return -1;
     }
     struct uthread *new_thread = &uthreads[slot];
     memset(&new_thread->context, 0, sizeof(new_thread->context));
+    num_threads++;
     new_thread->context.ra = (uint64)start_func;
     new_thread->context.sp = (uint64)&(new_thread->ustack) + STACK_SIZE;
     new_thread->state = RUNNABLE;
@@ -70,8 +71,12 @@ int uthread_create(void (*start_func)(), enum sched_priority priority){
 }
 
 void uthread_exit(){
+    num_threads--;
     mythread->state = FREE;
-    uthread_yield();
+    if(num_threads==0){
+        exit(0);
+    }
+    uscheduler();
 }
 
 enum sched_priority 
@@ -97,11 +102,26 @@ uthreadinit(){
 
 int uthread_start_all()
 {
-    if (first_thread)
-      return -1;
-    struct uthread *uthread = uscheduler();
-    uthread->state = RUNNING;
-    uswtch(&mythread->context, &uthread->context);
+    if(called_start_all_flag == 1)
+        return -1;
+    called_start_all_flag = 1;
+    struct uthread *ut;
+    enum sched_priority max_priority = LOW;
+    struct uthread *max_priority_thread = 0;
+    for (ut = uthreads; ut < &uthreads[MAX_UTHREADS]; ut++)
+    {
+      if (ut->state == RUNNABLE && ut->priority >= max_priority)
+      {
+            max_priority = ut->priority;
+            max_priority_thread = ut;
+      }
+    }
+    //start thread with max priority
+    mythread = max_priority_thread;
+    mythread->state = RUNNING;
+    void (*fptr)() = (void (*)())(mythread->context.ra);
+    (*fptr)();
+    exit(0);
     return 0;
 }
 
