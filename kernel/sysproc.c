@@ -100,13 +100,14 @@ sys_uptime(void)
 uint64
 sys_kthread_create(void)
 {
-  void *start_func;
+  uint64 start_func;
   argaddr(0, &start_func);
-  void *stack;
+  uint64 stack;
   argaddr(1, &stack);
-  uint stack_size;
+  int stack_size;
   argint(2, &stack_size);
-  return kthread_create(start_func, stack, stack_size);
+  int tid = kthread_create((void *(*)())start_func, (void *)stack, stack_size);
+  return tid;
 }
 
 uint64
@@ -129,15 +130,16 @@ sys_kthread_exit(void)
 {
   int status;
   argint(0, &status);
-  return kthread_exit(status);
+  kthread_exit(status);
+  return 0;
 }
 
 uint64
 sys_kthread_join(void)
 {
-  int thread_id;
-  argint(0, &thread_id); //Sababa?
+  int ktid;
+  argint(0, &ktid);
   uint64 status;
-  argaddr(1, &status); //Sababa?
-  return kthread_join(thread_id, status);
+  argaddr(1, &status);
+  return kthread_join(ktid,(int *)status);
 }

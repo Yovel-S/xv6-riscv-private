@@ -12,10 +12,11 @@
 #define KTHREAD_H
 #include "kthread.h"
 #endif
-struct spinlock wait_lock;
+extern struct spinlock wait_lock;
 
 extern struct proc proc[NPROC];
 extern void forkret(void);
+
 
 // Given a proc , it allocates a unique kernel thread ID using the counter and lock inside the proc
 int alloctid(struct proc *p)
@@ -102,7 +103,8 @@ freekthread(struct kthread *kt)
 
 int 
 kthread_create(void *(*start_func)(), void *stack, uint stack_size){
-  if(stack_size != KTHREAD_STACK_SIZE)
+  // printf("kthread_create start_func: %d\n", (uint64)start_func);
+  if(stack_size != MAX_STACK_SIZE)
     return -1;
 
   struct proc *p = myproc();
@@ -152,6 +154,7 @@ int kthread_kill(int ktid){
   return -1;
 }
 
+
 int
 kthread_killed(struct kthread *kt)
 {
@@ -163,24 +166,39 @@ kthread_killed(struct kthread *kt)
   return k;
 }
 
+int
+get_active_kthreads(struct proc *p)
+{
+  int count = 0;
+  for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    if (kt->tstate != TUNUSED && kt->tstate != TZOMBIE)
+      count++;
+    release(&kt->lock);
+  }
+  return count;
+}
+
 void kthread_exit(int status){
   /*
-  This function terminates the execution of the calling thread. If called by a
-  thread (even the main thread) while other threads exist within the same
-  process, it shouldn’t terminate the whole process. The number given in
-  status should be saved in the thread’s structure as its exit status
+  This function terminates the execution of the calling thread. 
+  If called by a thread (even the main thread) while other threads exist within the same process,
+  it shouldn’t terminate the whole process. 
+  The number given in status should be saved in the thread’s structure as its exit status.
   */
   struct proc *p = myproc();
   struct kthread *kt = mykthread();
 
-  acquire(&p->lock);
+  acquire(&kt->lock);
+  if(get_active_kthreads(p) == 1){
+    release(&kt->lock);
+    exit(status);
+  }
   kt->xstate = status;
   kt->tstate = ZOMBIE;
-  p->state = RUNNABLE;
-  release(&p->lock);
+  release(&kt->lock);
   wakeup(kt);
-
-  acquire(&p->lock);
+  acquire(&kt->lock);
   sched();
   panic("zombie exit");
 }
@@ -188,55 +206,52 @@ void kthread_exit(int status){
 int kthread_join(int ktid, int *status){
   /*
   This function suspends the execution of the calling thread until the target
-  thread (indicated by the argument ktid) terminates. When successful, the
-  pointer given in status is filled with the exit status (if it’s not null), and the
-  function returns zero. Otherwise, -1 should be returned to indicate an
-  error.
-  Note: calling this function with a ktid of an already terminated (but not yet
-  joined) kthread should succeed and allow fetching the exit status of the
-  kthread.
+  thread (indicated by the argument ktid) terminates. 
+  When successful, the pointer given in status is filled with the exit status (if it’s not null), 
+  and the function returns zero. 
+  Otherwise, -1 should be returned to indicate an error.
+  Note: calling this function with a ktid of an already terminated (but not yet joined) 
+  kthread should succeed and allow fetching the exit status of thekthread.
   */
   struct proc *p = myproc();
-  struct kthread *kt = mythread();
-  // thread cannot wait for himself
+  struct kthread *kt = mykthread();
+
+  //check that status isn't null pointer
+  if (status == 0)
+    return -1;
+
   if (kt->thread_id == ktid)
     return -1;
-  struct kthread *curr_t;
-  for (curr_t = p->kthread;curr_t < &p->kthread[NKT]; curr_t++)
-  {
-      acquire(&wait_lock);
-      // found
-      if (curr_t->thread_id == ktid)
-      {
-        while (curr_t->tstate != ZOMBIE)
-        {
-          // sleep until curr_t state is changed + release p.lock
-          sleep(curr_t, &wait_lock);
-          //if (kt->should_exit || kt->killed)
+    
+  struct kthread *t;
+  for (t = p->kthread;t < &p->kthread[NKT]; t++){
+      if (t->thread_id == ktid){
+        acquire(&wait_lock);
+        while (t->tstate != TZOMBIE){
+          // sleep until t state is changed + release p.lock
+          sleep(t, &wait_lock);
           if(kt->killed)
           {
             release(&wait_lock);
             return -1;
           }
         }
-        if (curr_t->tstate == ZOMBIE)
-        {
-          acquire(&p->lock);
-          // copyout the status of the exited thread
-          if (status != 0 && copyout(p->pagetable, status, (char *)&curr_t->xstate, sizeof(curr_t->xstate)) < 0)
-          {
-            release(&p->lock);
+        if (t->tstate == TZOMBIE){
+          acquire(&t->lock);
+          if (copyout(p->pagetable, (uint64)status, (char *)&t->xstate, sizeof(t->xstate)) < 0){
+            release(&t->lock);
             release(&wait_lock);
             return -1;
           }
-          freethread(curr_t);
-          release(&p->lock);
+          freekthread(t);
+          release(&t->lock);
           release(&wait_lock);
           return 0;
         }
       }
       release(&wait_lock);
     }
+    return -1;
 }
 
 /* This functions kills all threads except mykthread()*/
@@ -244,7 +259,7 @@ void kill_all_other_threads(){
   struct proc *p = myproc();
   struct kthread *kt = mykthread();
   struct kthread *t;
-  int *status;
+  int *status = 0;
   for(t = p->kthread; t < &p->kthread[NKT]; t++){
     if(t != kt){
       acquire(&t->lock);

@@ -7,6 +7,7 @@
 #include "kernel/syscall.h"
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
+#include "uthread.h"
 
 //
 // Tests xv6 system calls.  usertests without arguments runs them all
@@ -2571,6 +2572,101 @@ badarg(char *s)
   exit(0);
 }
 
+
+// starting the OS232 Assignment 2 simple tests
+
+volatile enum sched_priority x;
+
+
+void uthread_a_start_func(void){
+  if(x != MEDIUM){
+    printf("sched policy failed\n");
+    exit(1);
+  }
+  if(uthread_get_priority() != LOW){
+    printf("uthread_get_priority failed\n");
+    exit(1);
+  }
+  for(int i=0; i<10; i++){
+    sleep(10); // simulate work
+  }
+  uthread_exit();
+  printf("uthread_exit failed\n");
+  exit(1);
+}
+
+void uthread_b_start_func(void){
+  for(int i=0; i<10; i++){
+    sleep(10); // simulate work
+  }
+  x = uthread_get_priority();
+  uthread_exit();
+  printf("uthread_exit failed\n");
+  exit(1);
+}
+
+void ulttest()
+{
+  x = HIGH;
+  uthread_create(uthread_a_start_func, LOW);
+  uthread_create(uthread_b_start_func, MEDIUM);
+  uthread_start_all();
+  printf("uthread_start_all failed\n");
+  exit(1);
+}
+
+
+void kthread_start_func(void){
+  for(int i=0; i<10; i++){
+    printf("line 2621\n");
+    sleep(10); // simulate work
+  }
+  printf("line 2624\n");
+  kthread_exit(0);
+  printf("kthread_exit failed\n");
+  exit(1);
+}
+
+void klttest()
+{
+  uint64 stack_a = (uint64)malloc(MAX_STACK_SIZE);
+  uint64 stack_b = (uint64)malloc(MAX_STACK_SIZE);
+  printf("start function: %d\n", kthread_start_func);
+  int kt_a = kthread_create((void *(*)())kthread_start_func, (void *)stack_a, MAX_STACK_SIZE);
+  printf("line 2636\n");
+  if(kt_a <= 0){
+    printf("line 2638\n");
+    printf("kthread_create failed\n");
+    exit(1);
+  }
+  int kt_b = kthread_create((void *(*)())kthread_start_func, (void *)stack_b, MAX_STACK_SIZE);
+  printf("line 2643\n");
+  if(kt_a <= 0){
+    printf("line 2641\n");
+    printf("kthread_create failed\n");
+    exit(1);
+  }
+
+  printf("line 2646\n");
+  int joined = kthread_join(kt_a, 0);
+  printf("line 2647\n");
+  if(joined != 0){
+    printf("kthread_join failed\n");
+    exit(1);
+  }
+
+  joined = kthread_join(kt_b, 0);
+  printf("line 2654\n");
+  if(joined != 0){
+    printf("kthread_join failed\n");
+    exit(1);
+  }
+
+  printf("line 2660\n");
+  free((void *)stack_a);
+  free((void *)stack_b);
+}
+
 struct test {
   void (*f)(char *);
   char *s;
@@ -2635,6 +2731,8 @@ struct test {
   {sbrklast, "sbrklast"},
   {sbrk8000, "sbrk8000"},
   {badarg, "badarg" },
+  {klttest, "klttest"},
+  {ulttest, "ulttest"},
 
   { 0, 0},
 };

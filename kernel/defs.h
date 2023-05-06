@@ -108,8 +108,20 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 
 // kthread.c
-void                kthreadinit(struct proc *);
-struct kthread*     mykthread();
+void kthreadinit(struct proc *);
+struct kthread* mykthread();
+void kthread_exit(int status);
+int kthread_killed(struct kthread *k);
+void kthread_setkilled(struct kthread *k);
+void kthread_yield(void);
+void kthread_sleep(void *chan, struct spinlock *lk);
+void kthread_wakeup(void *chan);
+int kthread_create(void *(*start_func)(), void *stack, uint stack_size);
+int kthread_id(void);
+int kthread_join(int thread_id, int *status);
+int kthread_kill(int ktid);
+void kill_all_other_threads();
+
 
 // TODO: delte this after you are done with task 2.2
 // void allocproc_help_function(struct proc *p);
