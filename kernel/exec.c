@@ -115,8 +115,14 @@ exec(char *path, char **argv)
     goto bad;
 
 
-  // Terminates all threads except the current thread and waits for them to exit
-  kill_all_other_threads();
+  // Terminates all threads except the current thread and waits for them to exit  
+  for (struct kthread* t = p->kthread; t < &p->kthread[NKT]; t++){
+    if(t != kt && t->tstate != TUNUSED && t->tstate != TZOMBIE){
+      kthread_kill(t->thread_id);
+    }
+    kthread_join(t->thread_id, 0);
+  }
+
 
 
   // arguments to user main(argc, argv)

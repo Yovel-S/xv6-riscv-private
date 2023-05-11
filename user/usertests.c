@@ -2618,10 +2618,8 @@ void ulttest()
 
 void kthread_start_func(void){
   for(int i=0; i<10; i++){
-    printf("line 2621\n");
     sleep(10); // simulate work
   }
-  printf("line 2624\n");
   kthread_exit(0);
   printf("kthread_exit failed\n");
   exit(1);
@@ -2631,38 +2629,29 @@ void klttest()
 {
   uint64 stack_a = (uint64)malloc(MAX_STACK_SIZE);
   uint64 stack_b = (uint64)malloc(MAX_STACK_SIZE);
-  printf("start function: %d\n", kthread_start_func);
   int kt_a = kthread_create((void *(*)())kthread_start_func, (void *)stack_a, MAX_STACK_SIZE);
-  printf("line 2636\n");
   if(kt_a <= 0){
-    printf("line 2638\n");
     printf("kthread_create failed\n");
     exit(1);
   }
   int kt_b = kthread_create((void *(*)())kthread_start_func, (void *)stack_b, MAX_STACK_SIZE);
-  printf("line 2643\n");
   if(kt_a <= 0){
-    printf("line 2641\n");
     printf("kthread_create failed\n");
     exit(1);
   }
 
-  printf("line 2646\n");
   int joined = kthread_join(kt_a, 0);
-  printf("line 2647\n");
   if(joined != 0){
     printf("kthread_join failed\n");
     exit(1);
   }
 
   joined = kthread_join(kt_b, 0);
-  printf("line 2654\n");
   if(joined != 0){
     printf("kthread_join failed\n");
     exit(1);
   }
 
-  printf("line 2660\n");
   free((void *)stack_a);
   free((void *)stack_b);
 }
