@@ -145,7 +145,21 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+    #if SWAP_ALGO != NONE
+      if (p->pid > 2) {
+        release(&p->lock);
+        createSwapFile(p);
+        acquire(&p->lock);
+      }
+      for (int i = 0 ; i<MAX_PSYC_PAGES; i++){
+          #ifdef NFUA
+            p->phy_mem_pgs[i].accesscounter = 0;
+          #endif
+          #ifdef LAPA
+            p->phy_mem_pgs[i].accesscounter = 0xFFFFFFFF;
+          #endif
+      }
+    #endif
   return p;
 }
 
@@ -169,6 +183,15 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  #if SWAP_ALGO != NONE
+    if(p->pid > 2)
+      for (int i = 0; i < MAX_PSYC_PAGES; i++){
+        p->swap_file_pgs[i].state = UNUSED;
+        p->swap_file_pgs[i].address = UNUSED;
+        p->phy_mem_pgs[i].state = UNUSED;
+        p->phy_mem_pgs[i].address = UNUSED;
+      }
+  #endif
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -296,6 +319,29 @@ fork(void)
   }
   np->sz = p->sz;
 
+  #if SWAP_ALGO != NONE
+      static char buffer[PGSIZE*MAX_PSYC_PAGES];
+      int swap_file_size = 0;
+      if(p->pid > 2) {
+        for (int i = 0; i < MAX_PSYC_PAGES; i++){
+          np->swap_file_pgs[i].address = p->swap_file_pgs[i].address;
+          np->swap_file_pgs[i].state = p->swap_file_pgs[i].state;
+          np->phy_mem_pgs[i].address = p->phy_mem_pgs[i].address;
+          np->phy_mem_pgs[i].state = p->phy_mem_pgs[i].state;
+          np->phy_mem_pgs[i].creationTime = p->phy_mem_pgs[i].creationTime;
+          np->swap_file_pgs[i].accesscounter = p->swap_file_pgs[i].accesscounter;
+          if(p->swap_file_pgs[i].state == USED)
+            swap_file_size++;
+        }
+      release(&np->lock);
+      if(readFromSwapFile(p, buffer, 0, swap_file_size*PGSIZE) < 0)
+        panic("fork: readFromSwapFile failed\n");
+      if(writeToSwapFile(np, buffer, 0, swap_file_size*PGSIZE) < 0)
+        panic("fork: writeToSwapFile failed\n");
+      acquire(&np->lock);
+    }
+  #endif
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -359,6 +405,10 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+  #if SWAP_ALGO != NONE
+    if(p->pid > 2)
+      removeSwapFile(p);
+  #endif
 
   begin_op();
   iput(p->cwd);
@@ -679,5 +729,15 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+void updateINFO(){
+ struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if (p->pid > 2 && (p->state == RUNNING || p->state == RUNNABLE || p->state == SLEEPING))
+      updateCounter(p);
+    release(&p->lock);
   }
 }

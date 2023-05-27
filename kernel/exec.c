@@ -119,7 +119,35 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
-    
+
+  #ifndef NONE
+    if(p->pid > 2) {
+      for (int i = 0; i < MAX_PSYC_PAGES; i++){
+        p->swap_file_pgs[i].state = UNUSED;
+        p->swap_file_pgs[i].address = UNUSED;
+        p->phy_mem_pgs[i].state = UNUSED;
+        p->phy_mem_pgs[i].address = UNUSED;
+      }     
+      for(uint i = 0, address = 0; address < sz; address += PGSIZE, i++){
+        p->phy_mem_pgs[i].address = address;
+        p->phy_mem_pgs[i].state = USED;
+        #ifdef NFUA
+          printf("NFUA\n");
+          p->phy_mem_pgs[i].accesscounter = 0;
+        #endif
+        #ifdef LAPA
+          printf("LAPA\n");
+          p->phy_mem_pgs[i].accesscounter = 0xFFFFFFFF;
+        #endif
+        p->phy_mem_pgs[i].creationTime = creationTime();
+      }
+      if(removeSwapFile(p) < 0)
+        panic("exec: removeSwapFile failed");
+      if(createSwapFile(p) < 0)
+        panic("exec: createSwapFile failed");
+    }
+  #endif
+
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
